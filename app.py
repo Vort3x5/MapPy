@@ -1,3 +1,6 @@
+# app.py
+"""Główna aplikacja Streamlit z wzorcami projektowymi"""
+
 import streamlit as st
 import sys
 import os
@@ -6,6 +9,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from data.data_loader import DataLoaderFactory
+from data.data_processor import DataProcessor, CountryAggregationStrategy, RegionAggregationStrategy, TopNStrategy
+from utils.observers import DataManager, StreamlitObserverBridge
 
 
 def main():
@@ -18,11 +23,15 @@ def main():
     st.title("Eurostat Vehicle Data Analyzer")
     st.markdown("System analizy danych o pojazdach w Europie")
     
-    # Initialize session state
+    # Initialize session state z wzorcami projektowymi
+    if 'data_manager' not in st.session_state:
+        st.session_state.data_manager = DataManager()
+        st.session_state.observer_bridge = StreamlitObserverBridge(st.session_state.data_manager)
+        st.session_state.data_processor = DataProcessor(CountryAggregationStrategy())
+    
+    # Initialize other session state
     if 'data_loaded' not in st.session_state:
         st.session_state.data_loaded = False
-        st.session_state.env_data = None
-        st.session_state.tran_data = None
     
     # Sidebar
     with st.sidebar:
@@ -34,22 +43,31 @@ def main():
         
         # Status danych
         if st.session_state.data_loaded:
+            stats = st.session_state.data_manager.get_summary_stats()
             st.success("Dane załadowane pomyślnie")
-            if st.session_state.env_data:
-                st.write(f"Kraje środowiskowe: {len(st.session_state.env_data)}")
-            if st.session_state.tran_data:
-                st.write(f"Regiony transportowe: {len(st.session_state.tran_data)}")
+            
+            if stats['env_countries_total'] > 0:
+                st.write(f"Kraje środowiskowe: {stats['env_countries_total']}")
+            if stats['tran_regions_total'] > 0:
+                st.write(f"Regiony transportowe: {stats['tran_regions_total']}")
         
-        # Suwak zakresu lat
+        # Suwak zakresu lat z Observer Pattern
         if st.session_state.data_loaded:
             st.subheader("Zakres czasowy")
+            current_range = st.session_state.data_manager.year_range
+            
             year_range = st.slider(
                 "Wybierz lata",
                 min_value=2013,
                 max_value=2022,
-                value=(2018, 2022),
+                value=current_range,
                 key="year_range"
             )
+            
+            # Aktualizuj DataManager jeśli zmienił się zakres
+            if year_range != current_range:
+                st.session_state.data_manager.set_year_range(year_range)
+                
         else:
             st.info("Wczytaj dane aby aktywować kontrolki")
     
@@ -71,26 +89,30 @@ def main():
 
 
 def load_data():
-    """Wczytaj dane z plików Excel"""
+    """Wczytaj dane używając Factory Pattern"""
     try:
         factory = DataLoaderFactory()
         
         # Wczytaj dane środowiskowe
-        env_file = "in/env_waselvtdefaultview_spreadsheet.xlsx"
+        env_file = "data/env_waselvtdefaultview_spreadsheet.xlsx"
         if os.path.exists(env_file):
             with st.spinner("Wczytywanie danych środowiskowych..."):
                 env_loader = factory.create_loader('environmental')
-                st.session_state.env_data = env_loader.load(env_file)
+                env_data = env_loader.load(env_file)
+                # Użyj Observer Pattern do powiadomienia o załadowaniu
+                st.session_state.data_manager.load_environmental_data(env_data)
         
         # Wczytaj dane transportowe
-        tran_file = "in/tran_r_elvehstdefaultview_spreadsheet.xlsx"
+        tran_file = "data/tran_r_elvehstdefaultview_spreadsheet.xlsx"
         if os.path.exists(tran_file):
             with st.spinner("Wczytywanie danych transportowych..."):
                 tran_loader = factory.create_loader('transport')
-                st.session_state.tran_data = tran_loader.load(tran_file)
+                tran_data = tran_loader.load(tran_file)
+                # Użyj Observer Pattern do powiadomienia o załadowaniu
+                st.session_state.data_manager.load_transport_data(tran_data)
         
         # Sprawdź czy cokolwiek załadowano
-        if st.session_state.env_data or st.session_state.tran_data:
+        if st.session_state.data_manager.env_data or st.session_state.data_manager.tran_data:
             st.session_state.data_loaded = True
             st.success("Dane załadowane pomyślnie!")
             st.rerun()
@@ -102,10 +124,12 @@ def load_data():
 
 
 def show_environmental_tab():
-    """Zakładka z mapą środowiskową"""
+    """Zakładka z mapą środowiskową używająca Strategy Pattern"""
     st.header("Pojazdy zutylizowane")
     
-    if not st.session_state.data_loaded or not st.session_state.env_data:
+    data_manager = st.session_state.data_manager
+    
+    if not st.session_state.data_loaded or not data_manager.env_data:
         st.warning("Brak danych środowiskowych. Wczytaj dane za pomocą przycisku w sidebarze.")
         return
     
@@ -115,41 +139,64 @@ def show_environmental_tab():
         view_mode = st.radio("Widok", ["Europa", "Polska"], key="env_view")
         
         st.subheader("Informacje")
-        st.write(f"Liczba krajów: {len(st.session_state.env_data)}")
         
-        # Pokaż przykładowe kraje
-        if st.session_state.env_data:
-            sample_countries = [c.country_name for c in st.session_state.env_data[:5]]
-            st.write("Przykładowe kraje:")
-            for country in sample_countries:
-                st.write(f"- {country}")
+        # Użyj Strategy Pattern do przetworzenia danych
+        processor = st.session_state.data_processor
+        processor.set_strategy(CountryAggregationStrategy())
+        
+        processed_data = processor.process_data(
+            data_manager.get_filtered_env_data(),
+            data_manager.year_range
+        )
+        
+        st.write(f"Liczba krajów: {len(processed_data['countries'])}")
+        st.write(f"Zakres lat: {data_manager.year_range[0]} - {data_manager.year_range[1]}")
+        
+        # Top N krajów
+        if processed_data['countries']:
+            st.subheader("Top 5 krajów")
+            top_countries = sorted(
+                zip(processed_data['countries'], processed_data['totals']),
+                key=lambda x: x[1],
+                reverse=True
+            )[:5]
+            
+            for i, (country, total) in enumerate(top_countries):
+                st.write(f"{i+1}. {country}: {total:,.0f}")
     
     with col2:
         st.info("Mapa interaktywna - w implementacji...")
         
-        # Placeholder dla mapy
-        if st.session_state.env_data:
-            # Pokaż dane dla wybranego zakresu lat
-            year_range = st.session_state.get('year_range', (2018, 2022))
-            st.write(f"Zakres lat: {year_range[0]} - {year_range[1]}")
+        # Pokaż przetworzone dane
+        if processed_data['countries']:
+            # Użyj TopNStrategy do pokazania najlepszych krajów
+            top_processor = DataProcessor(TopNStrategy(n=10, sort_by='total'))
+            top_data = top_processor.process_data(
+                data_manager.get_filtered_env_data(),
+                data_manager.year_range
+            )
             
-            # Przykładowe dane
-            sample_data = []
-            for country in st.session_state.env_data[:10]:
-                total = country.get_total_for_period(year_range[0], year_range[1])
-                sample_data.append({
-                    'Kraj': country.country_name,
-                    'Suma': f"{total:,.0f}"
+            # Przygotuj dane do wyświetlenia
+            display_data = []
+            for i, (name, values, total) in enumerate(zip(top_data['names'], top_data['values'], top_data['totals'])):
+                display_data.append({
+                    'Pozycja': i + 1,
+                    'Kraj': name,
+                    'Suma': f"{total:,.0f}",
+                    f'{data_manager.year_range[0]}': f"{values[0]:,.0f}" if len(values) > 0 else "0",
+                    f'{data_manager.year_range[1]}': f"{values[-1]:,.0f}" if len(values) > 0 else "0"
                 })
             
-            st.dataframe(sample_data)
+            st.dataframe(display_data, use_container_width=True)
 
 
 def show_transport_tab():
-    """Zakładka z mapą transportową"""
+    """Zakładka z mapą transportową używająca Strategy Pattern"""
     st.header("Pojazdy elektryczne")
     
-    if not st.session_state.data_loaded or not st.session_state.tran_data:
+    data_manager = st.session_state.data_manager
+    
+    if not st.session_state.data_loaded or not data_manager.tran_data:
         st.warning("Brak danych transportowych. Wczytaj dane za pomocą przycisku w sidebarze.")
         return
     
@@ -158,40 +205,86 @@ def show_transport_tab():
     with col1:
         view_mode = st.radio("Widok", ["Europa", "Polska"], key="tran_view")
         
-        st.subheader("Informacje")
-        st.write(f"Liczba regionów: {len(st.session_state.tran_data)}")
+        st.subheader("Filtry")
         
-        # Pokaż kraje
-        countries = set(r.country_code for r in st.session_state.tran_data)
-        st.write(f"Kraje: {len(countries)}")
+        # Filtr kraju
+        countries = sorted(set(r.country_code for r in data_manager.tran_data))
+        selected_country = st.selectbox("Kraj:", ["Wszystkie"] + countries)
         
-        # Polskie regiony
-        poland_regions = [r for r in st.session_state.tran_data if r.country_code == 'PL']
-        st.write(f"Regiony polskie: {len(poland_regions)}")
+        # Filtr poziomu NUTS
+        nuts_levels = sorted(set(r.nuts_level for r in data_manager.tran_data))
+        selected_nuts = st.selectbox("Poziom NUTS:", ["Wszystkie"] + nuts_levels)
+        
+        # Zastosuj filtry przez Observer Pattern
+        filters = {}
+        if selected_country != "Wszystkie":
+            filters['country_code'] = selected_country
+        if selected_nuts != "Wszystkie":
+            filters['nuts_level'] = selected_nuts
+        
+        if filters != data_manager.data_filter:
+            data_manager.apply_filter(filters)
+        
+        # Użyj Strategy Pattern do agregacji
+        processor = DataProcessor(RegionAggregationStrategy())
+        
+        region_data = processor.process_data(
+            data_manager.get_filtered_tran_data(),
+            data_manager.year_range,
+            country_filter=selected_country if selected_country != "Wszystkie" else None,
+            nuts_level=selected_nuts if selected_nuts != "Wszystkie" else None
+        )
+        
+        st.write(f"Liczba regionów: {len(region_data['regions'])}")
+        
+        # Statystyki per poziom NUTS
+        if region_data['regions']:
+            nuts_stats = {}
+            for nuts_level in region_data['nuts_levels']:
+                if nuts_level not in nuts_stats:
+                    nuts_stats[nuts_level] = 0
+                nuts_stats[nuts_level] += 1
+            
+            st.subheader("Regiony per poziom NUTS")
+            for level, count in sorted(nuts_stats.items()):
+                st.write(f"NUTS {level}: {count}")
     
     with col2:
         st.info("Mapa regionów NUTS - w implementacji...")
         
-        # Pokaż przykładowe dane polskie
-        if view_mode == "Polska":
-            poland_regions = [r for r in st.session_state.tran_data if r.country_code == 'PL'][:10]
+        # Pokaż dane regionalne
+        if region_data['regions']:
+            # Użyj TopNStrategy dla regionów
+            top_processor = DataProcessor(TopNStrategy(n=15, sort_by='total'))
+            top_regions = top_processor.process_data(
+                data_manager.get_filtered_tran_data(),
+                data_manager.year_range
+            )
             
-            if poland_regions:
-                sample_data = []
-                for region in poland_regions:
-                    value_2022 = region.get_value_for_year(2022) or 0
-                    sample_data.append({
-                        'Region': region.region_name,
-                        'NUTS': region.nuts_level,
-                        '2022': f"{value_2022:,.0f}"
-                    })
-                
-                st.dataframe(sample_data)
+            display_data = []
+            for i, (name, values, total, item) in enumerate(zip(
+                top_regions['names'], 
+                top_regions['values'], 
+                top_regions['totals'],
+                top_regions['items']
+            )):
+                display_data.append({
+                    'Pozycja': i + 1,
+                    'Region': name,
+                    'Kraj': item.country_code,
+                    'NUTS': item.nuts_level,
+                    'Suma': f"{total:,.0f}",
+                    f'{data_manager.year_range[1]}': f"{values[-1]:,.0f}" if len(values) > 0 else "0"
+                })
+            
+            st.dataframe(display_data, use_container_width=True)
 
 
 def show_analysis_tab():
-    """Zakładka z analizą krajów"""
+    """Zakładka z analizą krajów używająca wszystkich wzorców"""
     st.header("Porównanie krajów")
+    
+    data_manager = st.session_state.data_manager
     
     if not st.session_state.data_loaded:
         st.warning("Wczytaj dane aby rozpocząć analizę.")
@@ -209,50 +302,122 @@ def show_analysis_tab():
             key="data_source"
         )
         
-        # Lista krajów w zależności od źródła
-        if data_source == "Pojazdy zutylizowane" and st.session_state.env_data:
-            available_countries = [c.country_name for c in st.session_state.env_data]
-        elif data_source == "Pojazdy elektryczne" and st.session_state.tran_data:
-            # Tylko kraje (NUTS level 0)
-            countries_set = set()
-            for region in st.session_state.tran_data:
-                if region.nuts_level <= 1:  # Kraje i regiony główne
-                    countries_set.add(region.region_name)
-            available_countries = sorted(list(countries_set))
+        # Lista krajów/regionów w zależności od źródła
+        if data_source == "Pojazdy zutylizowane" and data_manager.env_data:
+            available_items = [c.country_name for c in data_manager.env_data]
+        elif data_source == "Pojazdy elektryczne" and data_manager.tran_data:
+            # Tylko na poziomie krajów lub NUTS 1
+            available_items = []
+            for region in data_manager.tran_data:
+                if region.nuts_level <= 1:
+                    available_items.append(region.region_name)
+            available_items = sorted(list(set(available_items)))
         else:
-            available_countries = []
+            available_items = []
         
         # Wyszukiwanie
-        search_term = st.text_input("Szukaj kraju:", key="country_search")
+        search_term = st.text_input("Szukaj:", key="analysis_search")
         
         if search_term:
-            filtered_countries = [c for c in available_countries 
-                                if search_term.lower() in c.lower()]
+            filtered_items = [item for item in available_items 
+                            if search_term.lower() in item.lower()]
         else:
-            filtered_countries = available_countries
+            filtered_items = available_items
         
-        # Wybór krajów
-        selected_countries = st.multiselect(
-            "Wybierz kraje",
-            filtered_countries,
-            default=filtered_countries[:3] if filtered_countries else []
+        # Wybór krajów/regionów
+        selected_items = st.multiselect(
+            "Wybierz do porównania",
+            filtered_items,
+            default=filtered_items[:3] if filtered_items else []
         )
+        
+        # Aktualizuj wybór w DataManager (Observer Pattern)
+        if data_source == "Pojazdy zutylizowane":
+            if selected_items != data_manager.selected_countries:
+                data_manager.set_selected_countries(selected_items)
+        else:
+            if selected_items != data_manager.selected_regions:
+                data_manager.set_selected_regions(selected_items)
+        
+        # Opcje analizy
+        st.subheader("Opcje analizy")
+        analysis_type = st.radio(
+            "Typ analizy:",
+            ["Top N", "Porównanie", "Trend czasowy"]
+        )
+        
+        if analysis_type == "Top N":
+            top_n = st.slider("Liczba elementów", 5, 20, 10)
+            sort_criterion = st.selectbox("Sortuj według", ["total", "average", "latest"])
         
         # Export do PDF
         if st.button("Eksportuj do PDF"):
             st.success("Export PDF - w implementacji...")
     
     with col2:
-        if selected_countries:
-            st.subheader(f"Wykres dla: {', '.join(selected_countries)}")
-            st.info("Wykres słupkowy - w implementacji...")
+        if selected_items or analysis_type == "Top N":
+            # Wybierz odpowiednią strategię
+            if data_source == "Pojazdy zutylizowane":
+                if analysis_type == "Top N":
+                    strategy = TopNStrategy(n=top_n, sort_by=sort_criterion)
+                    data_to_process = data_manager.env_data
+                else:
+                    strategy = CountryAggregationStrategy()
+                    data_to_process = data_manager.get_filtered_env_data()
+            else:
+                if analysis_type == "Top N":
+                    strategy = TopNStrategy(n=top_n, sort_by=sort_criterion)
+                    data_to_process = data_manager.tran_data
+                else:
+                    strategy = RegionAggregationStrategy()
+                    data_to_process = data_manager.get_filtered_tran_data()
             
-            # Pokazuj przykładowe dane
-            st.write("Wybrane kraje:")
-            for country in selected_countries:
-                st.write(f"- {country}")
+            # Przetwórz dane używając Strategy Pattern
+            processor = DataProcessor(strategy)
+            result = processor.process_data(data_to_process, data_manager.year_range)
+            
+            # Wyświetl wyniki
+            if analysis_type == "Top N":
+                st.subheader(f"Top {len(result.get('names', []))} - {data_source}")
+                
+                if 'names' in result:
+                    chart_data = []
+                    for i, (name, total) in enumerate(zip(result['names'], result['totals'])):
+                        chart_data.append({
+                            'Pozycja': i + 1,
+                            'Nazwa': name,
+                            'Suma': f"{total:,.0f}",
+                            'Średnia': f"{result['averages'][i]:,.0f}"
+                        })
+                    
+                    st.dataframe(chart_data, use_container_width=True)
+                    
+                    # Prosty wykres słupkowy
+                    import pandas as pd
+                    chart_df = pd.DataFrame({
+                        'Nazwa': result['names'][:10],  # Top 10 dla czytelności
+                        'Wartość': result['totals'][:10]
+                    })
+                    st.bar_chart(chart_df.set_index('Nazwa'))
+                    
+            else:
+                st.subheader(f"Analiza: {', '.join(selected_items)}")
+                st.info("Szczegółowe wykresy porównawcze - w implementacji...")
+                
+                # Pokaż dane dla wybranych elementów
+                if 'countries' in result:
+                    items_key = 'countries'
+                elif 'regions' in result:
+                    items_key = 'regions'
+                else:
+                    items_key = 'names'
+                
+                if items_key in result and result[items_key]:
+                    st.write("Wybrane elementy:")
+                    for item in result[items_key]:
+                        st.write(f"- {item}")
         else:
-            st.write("Wybierz kraje aby wygenerować wykres")
+            st.write("Wybierz elementy do analizy lub użyj analizy Top N")
 
 
 if __name__ == "__main__":
