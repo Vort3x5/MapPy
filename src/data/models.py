@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 
 @dataclass
 class CountryData:
-    """Model danych dla krajów (env_waselvt)"""
     country_code: str
     country_name: str
     data_by_year: Dict[int, float]

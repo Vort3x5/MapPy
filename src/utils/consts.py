@@ -1,22 +1,16 @@
-# src/utils/consts.py
-"""Minimalna konfiguracja systemu"""
-
-# Konfiguracja Excel
 EXCEL_CONFIG = {
     'HEADER_ROW': 8,
     'DATA_START_ROW': 10
 }
 
-# Konfiguracja map
 MAP_CONFIG = {
     'EUROPE_CENTER': [54.5, 15.2],
-    'POLAND_CENTER': [52.0, 19.5],  # Bardziej precyzyjne centrum Polski
+    'POLAND_CENTER': [52.0, 19.5],
     'EUROPE_ZOOM': 4,
-    'POLAND_ZOOM': 7,  # Większy zoom dla Polski
+    'POLAND_ZOOM': 7,
     'COLOR_SCALE': 'YlOrRd'
 }
 
-# Konfiguracja wykresów
 CHART_CONFIG = {
     'WIDTH': 800,
     'HEIGHT': 600,
@@ -24,8 +18,6 @@ CHART_CONFIG = {
     'FONT_SIZE': 12
 }
 
-# Współrzędne krajów europejskich i regionów polskich
-# Źródło: Natural Earth Data (https://www.naturalearthdata.com/)
 COUNTRY_COORDINATES = {
     'poland': (52.0, 19.0),
     'germany': (51.0, 9.0),

@@ -1,13 +1,9 @@
-# src/data/data_processor.py
-"""Uproszczony Strategy Pattern do przetwarzania danych"""
-
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
 from .models import CountryData, RegionData
 
 
 class DataProcessingStrategy(ABC):
-    """Abstrakcyjna strategia przetwarzania danych"""
     
     @abstractmethod
     def process(self, data: List[Union[CountryData, RegionData]], 
@@ -16,7 +12,6 @@ class DataProcessingStrategy(ABC):
 
 
 class CountryAggregationStrategy(DataProcessingStrategy):
-    """Strategia agregacji danych krajów"""
     
     def process(self, data: List[CountryData], year_range: tuple, 
                 **kwargs) -> Dict[str, Any]:
@@ -46,7 +41,6 @@ class CountryAggregationStrategy(DataProcessingStrategy):
 
 
 class RegionAggregationStrategy(DataProcessingStrategy):
-    """Strategia agregacji danych regionów"""
     
     def process(self, data: List[RegionData], year_range: tuple,
                 country_filter: str = None, nuts_level: int = None, **kwargs) -> Dict[str, Any]:
@@ -88,7 +82,6 @@ class RegionAggregationStrategy(DataProcessingStrategy):
 
 
 class DataProcessor:
-    """Procesor używający Strategy Pattern"""
     
     def __init__(self, strategy: DataProcessingStrategy):
         self.strategy = strategy

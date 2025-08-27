@@ -65,7 +65,7 @@ class EnvironmentalDataLoader(DataLoader):
                     if pd.notna(cell_value):
                         try:
                             value_str = str(cell_value).replace(',', '').replace(' ', '')
-                            if value_str and value_str != 'i':  # 'i' to brak danych w Eurosttat
+                            if value_str and value_str != 'i':
                                 value = float(value_str)
                                 if value > 0:
                                     data_by_year[year] = value
@@ -81,7 +81,6 @@ class EnvironmentalDataLoader(DataLoader):
                     data_type='environmental'
                 )
                 countries.append(country_data)
-                print(f"   {country_name}: {len(data_by_year)} lat danych")
         
         return countries
     
@@ -149,8 +148,6 @@ class TransportDataLoader(DataLoader):
                 except (ValueError, TypeError):
                     continue
         
-        print(f"Znalezione lata: {years}")
-        
         for row_idx in range(data_start_row, len(df)):
             region_code = df.iloc[row_idx, 0]
             region_name = df.iloc[row_idx, 1]
@@ -171,7 +168,7 @@ class TransportDataLoader(DataLoader):
                     if pd.notna(cell_value):
                         try:
                             value_str = str(cell_value).replace(',', '').replace(' ', '')
-                            if value_str and value_str != ':':  # ':' to brak danych w Eurostat
+                            if value_str and value_str != ':':
                                 value = float(value_str)
                                 if value >= 0:
                                     data_by_year[year] = value
@@ -190,7 +187,6 @@ class TransportDataLoader(DataLoader):
                     data_by_year=data_by_year
                 )
                 regions.append(region_data)
-                print(f"   {region_name} ({region_code}): {len(data_by_year)} lat danych")
         
         return regions
     
@@ -209,7 +205,6 @@ class TransportDataLoader(DataLoader):
             return 3
     
     def _extract_country_code(self, region_code: str) -> str:
-        """Wydobądź kod kraju z kodu regionu NUTS"""
         if not region_code or len(region_code) < 2:
             return 'XX'
         return region_code[:2].upper()

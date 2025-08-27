@@ -1,6 +1,3 @@
-# src/utils/observers.py
-"""Uproszczony Observer Pattern"""
-
 from abc import ABC, abstractmethod
 from typing import List, Any, Dict
 import logging
@@ -8,7 +5,6 @@ from data.models import CountryData, RegionData
 
 
 class Observer(ABC):
-    """Abstrakcyjna klasa observer"""
     
     @abstractmethod
     def update(self, subject: 'Subject', event_type: str, data: Any):
@@ -16,7 +12,6 @@ class Observer(ABC):
 
 
 class Subject(ABC):
-    """Abstrakcyjna klasa subject"""
     
     def __init__(self):
         self._observers: List[Observer] = []
@@ -38,7 +33,6 @@ class Subject(ABC):
 
 
 class DataObserver(Observer):
-    """Prosty observer do reagowania na zmiany danych"""
     
     def __init__(self, name: str, callback=None):
         self.name = name
@@ -55,7 +49,6 @@ class DataObserver(Observer):
 
 
 class DataManager(Subject):
-    """Główny manager danych - implementuje Subject"""
     
     def __init__(self):
         super().__init__()
@@ -63,7 +56,6 @@ class DataManager(Subject):
         self.tran_data: List[RegionData] = []
         self.year_range: tuple = (2018, 2022)
         self.selected_countries: List[str] = []
-        self.selected_regions: List[str] = []
         self.data_filter: Dict[str, Any] = {}
     
     def load_environmental_data(self, data: List[CountryData]):
@@ -85,20 +77,10 @@ class DataManager(Subject):
         self.selected_countries = countries
         self.notify('countries_selected', {'old_selection': old_selection, 'new_selection': countries})
     
-    def set_selected_regions(self, regions: List[str]):
-        old_selection = self.selected_regions.copy()
-        self.selected_regions = regions
-        self.notify('regions_selected', {'old_selection': old_selection, 'new_selection': regions})
-    
     def apply_filter(self, filter_criteria: Dict[str, Any]):
         old_filter = self.data_filter.copy()
         self.data_filter.update(filter_criteria)
         self.notify('filter_applied', {'old_filter': old_filter, 'new_filter': self.data_filter})
-    
-    def clear_filters(self):
-        old_filter = self.data_filter.copy()
-        self.data_filter = {}
-        self.notify('filters_cleared', {'old_filter': old_filter})
     
     def get_filtered_env_data(self) -> List[CountryData]:
         filtered_data = self.env_data
@@ -108,9 +90,6 @@ class DataManager(Subject):
     
     def get_filtered_tran_data(self) -> List[RegionData]:
         filtered_data = self.tran_data
-        
-        if self.selected_regions:
-            filtered_data = [r for r in filtered_data if r.region_name in self.selected_regions]
         
         if 'country_code' in self.data_filter:
             country_code = self.data_filter['country_code'].upper()
@@ -133,13 +112,11 @@ class DataManager(Subject):
             'tran_regions_filtered': len(tran_filtered),
             'year_range': self.year_range,
             'selected_countries': self.selected_countries,
-            'selected_regions': self.selected_regions,
             'active_filters': self.data_filter
         }
 
 
 class StreamlitObserverBridge:
-    """Prosta klasa do integracji Observer Pattern ze Streamlit"""
     
     def __init__(self, data_manager: DataManager):
         self.data_manager = data_manager
@@ -150,9 +127,3 @@ class StreamlitObserverBridge:
         self.data_manager.attach(observer)
         self.component_observers[component_name] = observer
         return observer
-    
-    def unregister_component(self, component_name: str):
-        if component_name in self.component_observers:
-            observer = self.component_observers[component_name]
-            self.data_manager.detach(observer)
-            del self.component_observers[component_name]
