@@ -61,5 +61,4 @@ class PDFExporter:
             return Image(img_buffer, width=6*inch, height=4*inch)
             
         except Exception as e:
-            print(f"Błąd konwersji wykresu: {e}")
             return None
