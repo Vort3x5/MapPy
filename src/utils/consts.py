@@ -27,3 +27,52 @@ PDF_CONFIG = {
     'PAGE_SIZE': 'A4',
     'MARGIN': 50
 }
+
+# Współrzędne krajów europejskich i regionów polskich
+# Źródło: Natural Earth Data (https://www.naturalearthdata.com/) - publiczne dane geograficzne
+COUNTRY_COORDINATES = {
+    # Kraje europejskie - współrzędne głównych miast/centrów
+    'poland': (52.0, 19.0),
+    'germany': (51.0, 9.0),
+    'france': (46.0, 2.0),
+    'spain': (40.0, -4.0),
+    'italy': (42.0, 13.0),
+    'belgium': (50.8, 4.4),
+    'netherlands': (52.5, 5.8),
+    'austria': (47.0, 13.0),
+    'denmark': (56.0, 10.0),
+    'sweden': (59.0, 18.0),
+    'finland': (64.0, 26.0),
+    'norway': (62.0, 10.0),
+    'czechia': (49.8, 15.5),
+    'czech republic': (49.8, 15.5),
+    'slovakia': (48.7, 19.7),
+    'hungary': (47.5, 19.0),
+    'slovenia': (46.0, 15.0),
+    'croatia': (45.0, 16.0),
+    'romania': (46.0, 25.0),
+    'bulgaria': (43.0, 25.0),
+    'lithuania': (55.0, 24.0),
+    'latvia': (57.0, 24.0),
+    'estonia': (59.0, 26.0),
+    'portugal': (39.5, -8.0),
+    'greece': (39.0, 22.0),
+    'ireland': (53.0, -8.0),
+    # Polskie regiony NUTS-2 - współrzędne głównych miast
+    'mazowieckie': (52.2, 21.0),
+    'śląskie': (50.3, 19.2),
+    'wielkopolskie': (52.4, 17.0),
+    'małopolskie': (50.1, 20.1),
+    'dolnośląskie': (51.1, 16.3),
+    'łódzkie': (51.8, 19.5),
+    'zachodniopomorskie': (53.4, 15.6),
+    'pomorskie': (54.2, 18.6),
+    'warmińsko-mazurskie': (54.0, 20.5),
+    'kujawsko-pomorskie': (53.0, 18.6),
+    'podlaskie': (53.1, 23.2),
+    'lubelskie': (51.2, 22.9),
+    'podkarpackie': (49.6, 22.0),
+    'świętokrzyskie': (50.6, 20.6),
+    'lubuskie': (52.0, 15.2),
+    'opolskie': (50.5, 17.9)
+}
