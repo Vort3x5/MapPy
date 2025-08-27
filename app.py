@@ -1,3 +1,6 @@
+# app.py
+"""Główna aplikacja Streamlit"""
+
 import streamlit as st
 import sys
 import os
@@ -7,7 +10,7 @@ import pandas as pd
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from data.data_loader import DataLoaderFactory
-from data.data_processor import DataProcessor, CountryAggregationStrategy, RegionAggregationStrategy, TopNStrategy
+from data.data_processor import DataProcessor, CountryAggregationStrategy, RegionAggregationStrategy
 from utils.observers import DataManager
 from visual.chart import ChartVisualizer
 from visual.pdf import PDFExporter
@@ -22,19 +25,40 @@ except ImportError:
 
 
 def init_session_state():
-    """Inicjalizuj stan sesji"""
+    """Inicjalizuj stan sesji z Observer Pattern"""
     if 'initialized' not in st.session_state:
         st.session_state.data_manager = DataManager()
         st.session_state.data_processor = DataProcessor(CountryAggregationStrategy())
         st.session_state.chart_visualizer = ChartVisualizer()
         st.session_state.pdf_exporter = PDFExporter()
         st.session_state.data_loaded = False
+        
+        # Setup Observer Pattern
+        from utils.observers import StreamlitObserverBridge, DataObserver
+        st.session_state.observer_bridge = StreamlitObserverBridge(st.session_state.data_manager)
+        
+        # Rejestruj observerów dla komponentów
+        def map_refresh_callback(event_type, data):
+            if event_type in ['year_range_changed', 'countries_selected', 'filter_applied']:
+                # Oznacz że mapy wymagają odświeżenia
+                st.session_state.refresh_maps = True
+        
+        def chart_refresh_callback(event_type, data):
+            if event_type in ['year_range_changed', 'countries_selected']:
+                # Oznacz że wykresy wymagają odświeżenia
+                st.session_state.refresh_charts = True
+        
+        # Zarejestruj observerów
+        st.session_state.observer_bridge.register_component("maps", map_refresh_callback)
+        st.session_state.observer_bridge.register_component("charts", chart_refresh_callback)
+        
         st.session_state.initialized = True
 
 
 def main():
     st.set_page_config(
         page_title="Eurostat Vehicle Data Analyzer",
+        page_icon="🚗",
         layout="wide"
     )
     
@@ -79,7 +103,7 @@ def main():
             if stats['tran_regions_total'] > 0:
                 st.metric("Regiony (transportowe)", stats['tran_regions_total'])
             
-            # Zakres lat
+            # Zakres lat z Observer Pattern
             st.subheader("Zakres czasowy")
             current_range = st.session_state.data_manager.year_range
             
@@ -87,11 +111,15 @@ def main():
                 "Wybierz lata",
                 min_value=2013,
                 max_value=2022,
-                value=current_range
+                value=current_range,
+                key="year_range_slider"
             )
             
+            # Aktualizuj DataManager przez Observer Pattern
             if year_range != current_range:
                 st.session_state.data_manager.set_year_range(year_range)
+                # Observer Pattern automatycznie powiadomi komponenty
+                # ale musimy również odświeżyć Streamlit
                 st.rerun()
     
     # Główne zakładki
@@ -235,6 +263,8 @@ def show_environmental_tab():
         
         if selected_countries != data_manager.selected_countries:
             data_manager.set_selected_countries(selected_countries)
+            # Observer Pattern powiadomi o zmianie, ale wymuszamy też rerun
+            st.rerun()
     
     with col2:
         if viz_type == "Mapa interaktywna" and HAS_MAPS:
@@ -360,17 +390,28 @@ def show_environmental_statistics():
         with col4:
             st.metric("Najniższy", min_country[0], f"{min_country[1]:,.0f}")
         
-        # Wykres top krajów
-        top_processor = DataProcessor(TopNStrategy(n=10, sort_by='total'))
-        top_data = top_processor.process_data(
+        # Wykres krajów
+        processor = DataProcessor(CountryAggregationStrategy())
+        result = processor.process_data(
             data_manager.get_filtered_env_data(),
             data_manager.year_range
         )
         
-        if top_data['names']:
-            chart_viz = st.session_state.chart_visualizer
-            fig = chart_viz.create_top_n_chart(top_data, "Pojazdy zutylizowane")
-            st.plotly_chart(fig, use_container_width=True)
+        if result['countries']:
+            # Sortuj po sumie i weź top 10
+            sorted_data = list(zip(result['countries'], result['totals']))
+            sorted_data.sort(key=lambda x: x[1], reverse=True)
+            top_countries = sorted_data[:10]
+            
+            if top_countries:
+                chart_viz = st.session_state.chart_visualizer
+                # Przygotuj dane dla wykresu
+                top_result = {
+                    'names': [item[0] for item in top_countries],
+                    'totals': [item[1] for item in top_countries]
+                }
+                fig = chart_viz.create_top_n_chart(top_result, "Pojazdy zutylizowane")
+                st.plotly_chart(fig, use_container_width=True)
 
 
 def show_transport_tab():
@@ -414,6 +455,8 @@ def show_transport_tab():
         
         if filters != data_manager.data_filter:
             data_manager.apply_filter(filters)
+            # Observer Pattern powiadomi o zmianie, ale wymuszamy też rerun
+            st.rerun()
     
     with col2:
         if viz_type == "Mapa interaktywna" and HAS_MAPS:
@@ -451,25 +494,31 @@ def show_transport_table():
     st.subheader("Dane regionalne - Pojazdy elektryczne")
     
     data_manager = st.session_state.data_manager
-    top_processor = DataProcessor(TopNStrategy(n=20, sort_by='total'))
-    top_data = top_processor.process_data(
+    processor = DataProcessor(RegionAggregationStrategy())
+    result = processor.process_data(
         data_manager.get_filtered_tran_data(),
         data_manager.year_range
     )
     
-    if top_data['names']:
+    if result['regions']:
+        # Sortuj po sumie i weź top 20
+        region_data = list(zip(
+            result['regions'], 
+            result['totals'], 
+            result['country_codes'],
+            result['nuts_levels']
+        ))
+        region_data.sort(key=lambda x: x[1], reverse=True)
+        top_regions = region_data[:20]
+        
         display_data = []
-        for i, (name, values, total, item) in enumerate(zip(
-            top_data['names'], top_data['values'], top_data['totals'], top_data['items']
-        )):
+        for i, (name, total, country_code, nuts_level) in enumerate(top_regions):
             display_data.append({
                 'Lp.': i + 1,
                 'Region': name,
-                'Kod': item.region_code if hasattr(item, 'region_code') else 'N/A',
-                'Kraj': item.country_code if hasattr(item, 'country_code') else 'N/A',
-                'NUTS': f"Level {item.nuts_level}" if hasattr(item, 'nuts_level') else 'N/A',
-                'Suma': f"{total:,.0f}",
-                f'{data_manager.year_range[1]}': f"{values[-1]:,.0f}" if values else "0"
+                'Kraj': country_code,
+                'NUTS': f"Level {nuts_level}",
+                'Suma': f"{total:,.0f}"
             })
         
         st.dataframe(display_data, use_container_width=True)
@@ -549,21 +598,11 @@ def show_analysis_tab():
         st.subheader("Typ analizy")
         analysis_type = st.radio(
             "Wybierz:",
-            ["Porównanie wybranych", "Top N elementów", "Wykres czasowy", "Wykres kołowy"]
+            ["Porównanie wybranych", "Wykres czasowy", "Wykres kołowy"]
         )
         
         # Parametry dodatkowe
-        if analysis_type == "Top N elementów":
-            top_n = st.slider("Liczba elementów", 5, 20, 10)
-            sort_criterion = st.selectbox("Sortuj według", 
-                                        ["total", "average", "latest"],
-                                        format_func=lambda x: {
-                                            "total": "Suma",
-                                            "average": "Średnia", 
-                                            "latest": "Najnowsza"
-                                        }[x])
-        
-        elif analysis_type == "Wykres kołowy":
+        if analysis_type == "Wykres kołowy":
             pie_year = st.selectbox(
                 "Rok:",
                 list(range(data_manager.year_range[0], data_manager.year_range[1] + 1)),
@@ -589,19 +628,11 @@ def perform_analysis(data_source, analysis_type, selected_items, context):
     
     # Wybierz strategię
     if data_source == "Pojazdy zutylizowane":
-        if analysis_type == "Top N elementów":
-            strategy = TopNStrategy(n=context['top_n'], sort_by=context['sort_criterion'])
-            data_to_process = data_manager.env_data
-        else:
-            strategy = CountryAggregationStrategy()
-            data_to_process = data_manager.get_filtered_env_data()
+        strategy = CountryAggregationStrategy()
+        data_to_process = data_manager.get_filtered_env_data()
     else:
-        if analysis_type == "Top N elementów":
-            strategy = TopNStrategy(n=context['top_n'], sort_by=context['sort_criterion'])
-            data_to_process = data_manager.tran_data
-        else:
-            strategy = RegionAggregationStrategy()
-            data_to_process = data_manager.get_filtered_tran_data()
+        strategy = RegionAggregationStrategy()
+        data_to_process = data_manager.get_filtered_tran_data()
     
     # Przetwórz dane
     processor = DataProcessor(strategy)
@@ -610,14 +641,7 @@ def perform_analysis(data_source, analysis_type, selected_items, context):
     # Wyświetl wyniki
     chart_viz = st.session_state.chart_visualizer
     
-    if analysis_type == "Top N elementów":
-        st.subheader(f"Top {len(result.get('names', []))} - {data_source}")
-        
-        if result.get('names'):
-            fig = chart_viz.create_top_n_chart(result, data_source)
-            st.plotly_chart(fig, use_container_width=True)
-    
-    elif analysis_type == "Wykres czasowy" and selected_items:
+    if analysis_type == "Wykres czasowy" and selected_items:
         st.subheader(f"Trendy czasowe: {', '.join(selected_items[:3])}")
         fig = chart_viz.create_line_chart(result, data_source)
         st.plotly_chart(fig, use_container_width=True)
@@ -639,13 +663,13 @@ def perform_analysis(data_source, analysis_type, selected_items, context):
         st.plotly_chart(fig, use_container_width=True)
     
     else:
-        st.info("Wybierz elementy do analizy lub użyj analizy Top N")
+        st.info("Wybierz elementy do analizy")
 
 
 def export_to_pdf(selected_items, data_source, analysis_type):
     """Export do PDF"""
     try:
-        if not selected_items and analysis_type != "Top N elementów":
+        if not selected_items:
             st.error("Wybierz elementy do eksportu")
             return
         
