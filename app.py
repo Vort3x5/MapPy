@@ -12,6 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from data.data_loader import DataLoaderFactory
 from data.data_processor import DataProcessor, CountryAggregationStrategy, RegionAggregationStrategy
 from utils.observers import DataManager
+from utils.consts import MAP_CONFIG
 from visual.chart import ChartVisualizer
 from visual.pdf import PDFExporter
 
@@ -275,6 +276,10 @@ def show_environmental_tab():
             show_environmental_chart()
         else:
             show_environmental_statistics()
+        
+        # Debug info dla przełącznika
+        if view_mode == "Polska":
+            st.info(f"Tryb Polski: mapa skupiona na Polsce (zoom {MAP_CONFIG['POLAND_ZOOM']}), dane filtrowane do polskich krajów/regionów")
 
 
 def show_environmental_map(view_mode):
@@ -465,6 +470,10 @@ def show_transport_tab():
             show_transport_table()
         else:
             show_transport_chart(selected_country)
+        
+        # Debug info dla przełącznika
+        if view_mode == "Polska":
+            st.info(f"Tryb Polski: mapa skupiona na Polsce (zoom {MAP_CONFIG['POLAND_ZOOM']}), dane filtrowane do polskich regionów NUTS")
 
 
 def show_transport_map(view_mode):
@@ -550,158 +559,175 @@ def show_transport_chart(selected_country):
 
 
 def show_analysis_tab():
-    """Zakładka analizy"""
+    """Minimalna zakładka analizy - tylko wymagania z instrukcji"""
     st.header("Analiza i porównania")
     
     data_manager = st.session_state.data_manager
     
-    col1, col2 = st.columns([1, 2])
+    # Sekcja 1: Przełącznik źródła danych (punkt 5 instrukcji)
+    st.subheader("Wybierz źródło danych")
+    data_source = st.radio(
+        "",
+        ["Pojazdy zutylizowane (kraje)", "Pojazdy elektryczne (regiony)"],
+        horizontal=True
+    )
     
-    with col1:
-        st.subheader("Konfiguracja")
-        
-        # Wybór źródła danych
-        data_source = st.radio(
-            "Źródło danych",
-            ["Pojazdy zutylizowane", "Pojazdy elektryczne"]
-        )
-        
-        # Lista elementów
-        if data_source == "Pojazdy zutylizowane" and data_manager.env_data:
-            available_items = [c.country_name for c in data_manager.env_data]
-        elif data_source == "Pojazdy elektryczne" and data_manager.tran_data:
-            available_items = []
-            for region in data_manager.tran_data:
-                if region.nuts_level <= 1:
-                    available_items.append(f"{region.region_name} ({region.country_code})")
-            available_items = sorted(list(set(available_items)))
-        else:
-            available_items = []
-        
-        # Wyszukiwanie
-        search_term = st.text_input("Szukaj:", placeholder="Wpisz nazwę...")
-        
-        if search_term:
-            filtered_items = [item for item in available_items 
-                            if search_term.lower() in item.lower()]
-        else:
-            filtered_items = available_items[:20]
-        
-        # Wybór do porównania
-        selected_items = st.multiselect(
-            "Wybierz do porównania",
-            filtered_items,
-            default=filtered_items[:3] if filtered_items else []
-        )
-        
-        # Typ analizy
-        st.subheader("Typ analizy")
-        analysis_type = st.radio(
-            "Wybierz:",
-            ["Porównanie wybranych", "Wykres czasowy", "Wykres kołowy"]
-        )
-        
-        # Parametry dodatkowe
-        if analysis_type == "Wykres kołowy":
-            pie_year = st.selectbox(
-                "Rok:",
-                list(range(data_manager.year_range[0], data_manager.year_range[1] + 1)),
-                index=-1
-            )
-        
-        # Export
-        st.subheader("Export")
-        if st.button("Eksportuj PDF", type="primary"):
-            export_to_pdf(selected_items, data_source, analysis_type)
-    
-    with col2:
-        # Wykonaj analizę
-        try:
-            perform_analysis(data_source, analysis_type, selected_items, locals())
-        except Exception as e:
-            st.error(f"Błąd analizy: {str(e)}")
-
-
-def perform_analysis(data_source, analysis_type, selected_items, context):
-    """Wykonaj analizę"""
-    data_manager = st.session_state.data_manager
-    
-    # Wybierz strategię
-    if data_source == "Pojazdy zutylizowane":
-        strategy = CountryAggregationStrategy()
-        data_to_process = data_manager.get_filtered_env_data()
+    # Przygotuj listę elementów
+    if "zutylizowane" in data_source and data_manager.env_data:
+        available_items = [c.country_name for c in data_manager.env_data 
+                          if not any(skip in c.country_name.lower() 
+                                   for skip in ['european union', 'euro area'])]
+    elif "elektryczne" in data_source and data_manager.tran_data:
+        available_items = []
+        seen = set()
+        for region in data_manager.tran_data:
+            if region.nuts_level <= 1:
+                name = f"{region.region_name} ({region.country_code})"
+                if name not in seen:
+                    available_items.append(name)
+                    seen.add(name)
+        available_items = sorted(available_items)
     else:
-        strategy = RegionAggregationStrategy()
-        data_to_process = data_manager.get_filtered_tran_data()
+        available_items = []
     
-    # Przetwórz dane
-    processor = DataProcessor(strategy)
-    result = processor.process_data(data_to_process, data_manager.year_range)
+    # Sekcja 2: Filtrowanie/wyszukiwanie (punkt 7 instrukcji)
+    st.subheader("Lista krajów/regionów")
     
-    # Wyświetl wyniki
+    search_term = st.text_input(
+        "Filtrowanie po nazwie:",
+        placeholder="Wpisz nazwę kraju lub regionu...",
+        key="search_countries"
+    )
+    
+    # Filtruj wyniki
+    if search_term:
+        filtered_items = [item for item in available_items 
+                        if search_term.lower() in item.lower()]
+    else:
+        filtered_items = available_items
+    
+    st.caption(f"Znaleziono: {len(filtered_items)} elementów")
+    
+    # Sekcja 3: Wybór krajów i generowanie wykresu (punkt 6 instrukcji)
+    selected_items = st.multiselect(
+        "Wybierz kraje/regiony:",
+        filtered_items,
+        default=filtered_items[:3] if len(filtered_items) >= 3 else filtered_items,
+        key="selected_countries_analysis"
+    )
+    
+    if selected_items:
+        # Wykres słupkowy (wymaganie punktu 6)
+        if st.button("Wygeneruj wykres słupkowy", type="primary"):
+            generate_bar_chart(data_source, selected_items)
+        
+        # Export PDF (punkt 9 instrukcji)
+        st.subheader("Export")
+        if st.button("Eksportuj wykres do PDF"):
+            export_chart_pdf(data_source, selected_items)
+    else:
+        st.info("Wybierz kraje/regiony z listy aby wygenerować wykres")
+
+
+def generate_bar_chart(data_source, selected_items):
+    """Generuj tylko wykres słupkowy - punkt 6 instrukcji"""
+    data_manager = st.session_state.data_manager
     chart_viz = st.session_state.chart_visualizer
     
-    if analysis_type == "Wykres czasowy" and selected_items:
-        st.subheader(f"Trendy czasowe: {', '.join(selected_items[:3])}")
-        fig = chart_viz.create_line_chart(result, data_source)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    elif analysis_type == "Wykres kołowy" and selected_items:
-        pie_year = context.get('pie_year', data_manager.year_range[1])
-        st.subheader(f"Udział w {pie_year}")
-        fig = chart_viz.create_pie_chart(result, data_source, pie_year)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    elif analysis_type == "Porównanie wybranych" and selected_items:
-        st.subheader(f"Porównanie: {', '.join(selected_items[:3])}")
-        
-        if len(selected_items) == 2:
-            fig = chart_viz.create_comparison_chart(result, data_source)
-        else:
-            fig = chart_viz.create_bar_chart(result, data_source)
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    else:
-        st.info("Wybierz elementy do analizy")
-
-
-def export_to_pdf(selected_items, data_source, analysis_type):
-    """Export do PDF"""
     try:
-        if not selected_items:
-            st.error("Wybierz elementy do eksportu")
+        # Przygotuj dane i filtruj do wybranych elementów
+        if "zutylizowane" in data_source:
+            # Dane krajów - filtruj do wybranych
+            all_data = data_manager.env_data
+            filtered_data = [c for c in all_data if c.country_name in selected_items]
+            strategy = CountryAggregationStrategy()
+            chart_data_source = "Pojazdy zutylizowane"
+        else:
+            # Dane regionów - filtruj do wybranych (usuń kody krajów z nazw)
+            all_data = data_manager.tran_data
+            # Wyciągnij same nazwy regionów z selected_items (usuń " (XX)")
+            selected_region_names = []
+            for item in selected_items:
+                if " (" in item:
+                    region_name = item.split(" (")[0]
+                    selected_region_names.append(region_name)
+                else:
+                    selected_region_names.append(item)
+            
+            filtered_data = [r for r in all_data if r.region_name in selected_region_names]
+            strategy = RegionAggregationStrategy()
+            chart_data_source = "Pojazdy elektryczne"
+        
+        print(f"DEBUG: Wybrano {len(selected_items)} elementów")
+        print(f"DEBUG: Przefiltrowano do {len(filtered_data)} elementów danych")
+        
+        if not filtered_data:
+            st.error("Nie znaleziono danych dla wybranych elementów")
             return
         
+        processor = DataProcessor(strategy)
+        result = processor.process_data(filtered_data, data_manager.year_range)
+        
+        # Wykres słupkowy z unikalnym kluczem
+        fig = chart_viz.create_bar_chart(result, chart_data_source)
+        st.plotly_chart(fig, use_container_width=True, key=f"analysis_chart_{len(selected_items)}")
+        
+        st.success("Wykres wygenerowany!")
+        
+    except Exception as e:
+        st.error(f"Błąd generowania wykresu: {str(e)}")
+        print(f"DEBUG Error: {str(e)}")
+
+
+def export_chart_pdf(data_source, selected_items):
+    """Export wykresu do PDF - punkt 9 instrukcji"""
+    try:
         data_manager = st.session_state.data_manager
         chart_viz = st.session_state.chart_visualizer
         pdf_exporter = st.session_state.pdf_exporter
         
         with st.spinner("Generowanie PDF..."):
-            # Przygotuj dane
-            if data_source == "Pojazdy zutylizowane":
+            # Przygotuj dane - filtruj do wybranych elementów (tak samo jak w generate_bar_chart)
+            if "zutylizowane" in data_source:
+                all_data = data_manager.env_data
+                filtered_data = [c for c in all_data if c.country_name in selected_items]
                 strategy = CountryAggregationStrategy()
-                data_to_process = data_manager.get_filtered_env_data()
+                chart_data_source = "Pojazdy zutylizowane"
             else:
+                all_data = data_manager.tran_data
+                # Wyciągnij nazwy regionów bez kodów krajów
+                selected_region_names = []
+                for item in selected_items:
+                    if " (" in item:
+                        region_name = item.split(" (")[0]
+                        selected_region_names.append(region_name)
+                    else:
+                        selected_region_names.append(item)
+                
+                filtered_data = [r for r in all_data if r.region_name in selected_region_names]
                 strategy = RegionAggregationStrategy()
-                data_to_process = data_manager.get_filtered_tran_data()
+                chart_data_source = "Pojazdy elektryczne"
+            
+            if not filtered_data:
+                st.error("Nie znaleziono danych dla wybranych elementów")
+                return
             
             processor = DataProcessor(strategy)
-            result = processor.process_data(data_to_process, data_manager.year_range)
+            result = processor.process_data(filtered_data, data_manager.year_range)
             
-            # Wykres
-            fig = chart_viz.create_bar_chart(result, data_source)
+            # Wykres słupkowy
+            fig = chart_viz.create_bar_chart(result, chart_data_source)
             
             # Export
             pdf_path = pdf_exporter.export_chart(
                 figure=fig,
                 countries=selected_items[:5],
-                data_source=data_source,
+                data_source=chart_data_source,
                 year_range=data_manager.year_range,
                 additional_data=result
             )
             
-            st.success("Raport PDF wygenerowany")
+            st.success("Raport PDF wygenerowany!")
             
             # Download
             with open(pdf_path, "rb") as pdf_file:
@@ -709,9 +735,10 @@ def export_to_pdf(selected_items, data_source, analysis_type):
                     "Pobierz PDF",
                     data=pdf_file.read(),
                     file_name=os.path.basename(pdf_path),
-                    mime="application/pdf"
+                    mime="application/pdf",
+                    key="download_minimal_pdf"
                 )
-    
+                
     except Exception as e:
         st.error(f"Błąd eksportu: {str(e)}")
 

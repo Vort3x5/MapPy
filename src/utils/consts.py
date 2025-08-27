@@ -1,20 +1,22 @@
+# src/utils/consts.py
+"""Minimalna konfiguracja systemu"""
+
+# Konfiguracja Excel
 EXCEL_CONFIG = {
-    'ENV_SHEET': 'Sheet 1',
-    'TRAN_SHEET': 'Sheet 1', 
     'HEADER_ROW': 8,
-    'DATA_START_ROW': 10,
-    'ENV_YEAR_RANGE': (2013, 2022),
-    'TRAN_YEAR_RANGE': (2018, 2022)
+    'DATA_START_ROW': 10
 }
 
+# Konfiguracja map
 MAP_CONFIG = {
     'EUROPE_CENTER': [54.5, 15.2],
-    'POLAND_CENTER': [51.9, 19.1],
+    'POLAND_CENTER': [52.0, 19.5],  # Bardziej precyzyjne centrum Polski
     'EUROPE_ZOOM': 4,
-    'POLAND_ZOOM': 6,
+    'POLAND_ZOOM': 7,  # Większy zoom dla Polski
     'COLOR_SCALE': 'YlOrRd'
 }
 
+# Konfiguracja wykresów
 CHART_CONFIG = {
     'WIDTH': 800,
     'HEIGHT': 600,
@@ -22,16 +24,9 @@ CHART_CONFIG = {
     'FONT_SIZE': 12
 }
 
-PDF_CONFIG = {
-    'OUTPUT_DIR': 'output/reports',
-    'PAGE_SIZE': 'A4',
-    'MARGIN': 50
-}
-
 # Współrzędne krajów europejskich i regionów polskich
-# Źródło: Natural Earth Data (https://www.naturalearthdata.com/) - publiczne dane geograficzne
+# Źródło: Natural Earth Data (https://www.naturalearthdata.com/)
 COUNTRY_COORDINATES = {
-    # Kraje europejskie - współrzędne głównych miast/centrów
     'poland': (52.0, 19.0),
     'germany': (51.0, 9.0),
     'france': (46.0, 2.0),
@@ -58,7 +53,6 @@ COUNTRY_COORDINATES = {
     'portugal': (39.5, -8.0),
     'greece': (39.0, 22.0),
     'ireland': (53.0, -8.0),
-    # Polskie regiony NUTS-2 - współrzędne głównych miast
     'mazowieckie': (52.2, 21.0),
     'śląskie': (50.3, 19.2),
     'wielkopolskie': (52.4, 17.0),

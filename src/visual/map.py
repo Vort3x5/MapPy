@@ -58,13 +58,66 @@ class MapVisualizer:
         start_year, end_year = year_range
         records = []
         
+        # Debug - sprawdź wartość view_mode
+        print(f"DEBUG: view_mode = '{view_mode}' (typ: {type(view_mode)})")
+        
+        # Debug - pokaż pierwsze dane
+        print(f"DEBUG: Pierwsze 5 elementów w danych:")
+        for i, item in enumerate(data[:5]):
+            if isinstance(item, CountryData):
+                print(f"  {i+1}. Kraj: '{item.country_name}' (kod: '{item.country_code}')")
+            else:
+                print(f"  {i+1}. Region: '{item.region_name}' (kraj: '{item.country_code}', kod: '{item.region_code}')")
+        
+        # Nazwy do pominięcia (agregaty EU)
+        skip_names = [
+            'european union',
+            'euro area', 
+            'oecd',
+            'world',
+            'total',
+            '27 countries',
+            '28 countries'
+        ]
+        
+        # Sprawdź czy tryb to Polska (różne warianty)
+        is_poland_mode = view_mode.lower() in ['poland', 'polska']
+        print(f"DEBUG: is_poland_mode = {is_poland_mode}")
+        
         for item in data:
-            # Filtruj dla Polski jeśli potrzeba
-            if view_mode == 'Poland':
-                if isinstance(item, RegionData) and item.country_code != 'PL':
+            # Pomiń agregaty europejskie
+            name_lower = item.country_name.lower() if isinstance(item, CountryData) else item.region_name.lower()
+            if any(skip in name_lower for skip in skip_names):
+                continue
+            
+            # Filtrowanie dla trybu Polska
+            if is_poland_mode:
+                should_include = False
+                
+                if isinstance(item, RegionData):
+                    # Regiony - sprawdź kod kraju
+                    if (item.country_code and item.country_code.upper() == 'PL') or \
+                       (item.region_code and item.region_code.startswith('PL')):
+                        should_include = True
+                        print(f"DEBUG: Polski region włączony: {item.region_name}")
+                
+                elif isinstance(item, CountryData):
+                    # Kraje - sprawdź czy to Polska
+                    poland_variants = ['poland', 'polska', 'republic of poland', 'pol']
+                    country_name_lower = item.country_name.lower()
+                    country_code_upper = (item.country_code or '').upper()
+                    
+                    if any(variant in country_name_lower for variant in poland_variants) or \
+                       country_code_upper == 'PL':
+                        should_include = True
+                        print(f"DEBUG: Polski kraj włączony: {item.country_name}")
+                
+                if not should_include:
+                    print(f"DEBUG: Pomijam (nie polska): {name_lower}")
                     continue
-                elif isinstance(item, CountryData) and item.country_name != 'Poland':
-                    continue
+            else:
+                # Tryb Europa - włącz wszystko poza agregatami
+                print(f"DEBUG: Europa - włączam: {name_lower}")
             
             # Oblicz wartości dla zakresu lat
             values = []
@@ -100,6 +153,12 @@ class MapVisualizer:
                         'nuts_level': item.nuts_level,
                         'type': 'region'
                     })
+        
+        print(f"DEBUG: Finalne {len(records)} elementów dla trybu '{view_mode}'")
+        if records:
+            print("DEBUG: Pierwsze 3 finalne elementy:")
+            for i, record in enumerate(records[:3]):
+                print(f"  {i+1}. {record['name']} (wartość: {record['value']:.0f})")
         
         return pd.DataFrame(records)
 
@@ -144,17 +203,53 @@ class MapVisualizer:
         """Pobierz współrzędne z pliku consts.py"""
         from utils.consts import COUNTRY_COORDINATES
         
-        name_lower = name.lower()
+        name_lower = name.lower().strip()
         
         # Szukaj dokładnego dopasowania
         if name_lower in COUNTRY_COORDINATES:
             return COUNTRY_COORDINATES[name_lower]
+        
+        # Mapowanie alternatywnych nazw
+        name_mappings = {
+            'polska': 'poland',
+            'niemcy': 'germany', 
+            'francja': 'france',
+            'hiszpania': 'spain',
+            'włochy': 'italy',
+            'czechy': 'czechia',
+            'węgry': 'hungary',
+            # Polskie regiony - różne warianty
+            'mazovia': 'mazowieckie',
+            'silesia': 'śląskie',
+            'greater poland': 'wielkopolskie',
+            'lesser poland': 'małopolskie',
+            'lower silesia': 'dolnośląskie',
+            'lodz': 'łódzkie',
+            'west pomerania': 'zachodniopomorskie',
+            'pomerania': 'pomorskie',
+            'warmia-masuria': 'warmińsko-mazurskie',
+            'kuyavia-pomerania': 'kujawsko-pomorskie',
+            'podlachia': 'podlaskie',
+            'lublin': 'lubelskie',
+            'subcarpathia': 'podkarpackie',
+            'holy cross': 'świętokrzyskie',
+            'lubusz': 'lubuskie',
+            'opole': 'opolskie'
+        }
+        
+        # Sprawdź mapowania
+        if name_lower in name_mappings:
+            mapped_name = name_mappings[name_lower]
+            if mapped_name in COUNTRY_COORDINATES:
+                return COUNTRY_COORDINATES[mapped_name]
         
         # Szukaj częściowego dopasowania
         for key, coords in COUNTRY_COORDINATES.items():
             if key in name_lower or name_lower in key:
                 return coords
         
+        # Jeśli nie znaleziono, pokaż w debug
+        print(f"DEBUG: Nie znaleziono współrzędnych dla '{name}'")
         return None
     
     def _calculate_radius(self, value: float, min_val: float, max_val: float) -> float:

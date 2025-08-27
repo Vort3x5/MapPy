@@ -1,4 +1,5 @@
-"""Interaktywne wykresy z Plotly"""
+# src/visual/chart.py
+"""Interaktywne wykresy z Plotly - poprawione etykiety"""
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -10,7 +11,7 @@ from utils.consts import CHART_CONFIG
 
 
 class ChartVisualizer:
-    """Główna klasa do tworzenia interaktywnych wykresów"""
+    """Klasa do tworzenia wykresów z czytelnymi etykietami"""
     
     def __init__(self):
         self.color_palette = CHART_CONFIG['COLORS']
@@ -19,7 +20,7 @@ class ChartVisualizer:
         self.font_size = CHART_CONFIG['FONT_SIZE']
     
     def create_bar_chart(self, data: Dict[str, Any], data_source: str) -> go.Figure:
-        """Stwórz interaktywny wykres słupkowy dla porównania krajów"""
+        """Wykres słupkowy z czytelnymi etykietami"""
         
         fig = go.Figure()
         
@@ -30,7 +31,7 @@ class ChartVisualizer:
         if not countries or not years or not values:
             return self._create_empty_chart("Brak danych do wyświetlenia")
         
-        # Stwórz wykres grupowany dla każdego kraju/regionu
+        # Stwórz wykres grupowany
         for i, country in enumerate(countries):
             country_values = values[i] if i < len(values) else []
             color = self.color_palette[i % len(self.color_palette)]
@@ -48,56 +49,63 @@ class ChartVisualizer:
                 ),
                 text=[f'{v:,.0f}' if v > 0 else '' for v in country_values],
                 textposition='auto',
+                textfont=dict(color='black', size=10)
             ))
         
-        # Dostosuj layout
-        title = self._generate_chart_title(countries, data_source)
-        y_axis_label = self._get_y_axis_label(data_source)
+        # Layout z czytelnymi etykietami
+        title = f"Porównanie: {data_source}"
         
         fig.update_layout(
             title={
                 'text': title,
                 'x': 0.5,
                 'xanchor': 'center',
-                'font': {'size': 16, 'color': 'black'}
+                'font': {'size': 18, 'color': 'black', 'family': 'Arial'}
             },
             xaxis_title='Rok',
-            yaxis_title=y_axis_label,
+            yaxis_title=self._get_y_axis_label(data_source),
             barmode='group',
             width=self.width,
             height=self.height,
-            font={'size': self.font_size},
+            font={'size': self.font_size, 'color': 'black', 'family': 'Arial'},
             hovermode='x unified',
             legend={
                 'orientation': 'h',
                 'yanchor': 'bottom',
                 'y': 1.02,
                 'xanchor': 'right',
-                'x': 1
+                'x': 1,
+                'font': {'color': 'black'}
             },
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
         
-        # Stylizuj osie
+        # Osie z ciemnymi etykietami
         fig.update_xaxes(
             showgrid=True, 
             gridcolor='lightgray',
             showline=True, 
-            linecolor='black'
+            linecolor='black',
+            title_font=dict(size=14, color='black', family='Arial'),
+            tickfont=dict(size=12, color='black', family='Arial'),
+            linewidth=2
         )
         fig.update_yaxes(
             showgrid=True, 
             gridcolor='lightgray',
             showline=True, 
             linecolor='black',
-            tickformat=',.0f'
+            tickformat=',.0f',
+            title_font=dict(size=14, color='black', family='Arial'),
+            tickfont=dict(size=12, color='black', family='Arial'),
+            linewidth=2
         )
         
         return fig
     
     def create_line_chart(self, data: Dict[str, Any], data_source: str) -> go.Figure:
-        """Stwórz wykres liniowy dla trendów czasowych"""
+        """Wykres liniowy z czytelnymi etykietami"""
         
         fig = go.Figure()
         
@@ -128,32 +136,48 @@ class ChartVisualizer:
             ))
         
         # Layout
-        title = f"Trendy czasowe: {self._generate_chart_title(countries, data_source)}"
+        title = f"Trendy czasowe: {data_source}"
         
         fig.update_layout(
             title={
                 'text': title,
                 'x': 0.5,
                 'xanchor': 'center',
-                'font': {'size': 16, 'color': 'black'}
+                'font': {'size': 18, 'color': 'black', 'family': 'Arial'}
             },
             xaxis_title='Rok',
             yaxis_title=self._get_y_axis_label(data_source),
             width=self.width,
             height=self.height,
-            font={'size': self.font_size},
+            font={'size': self.font_size, 'color': 'black', 'family': 'Arial'},
             hovermode='x unified',
             plot_bgcolor='white',
-            paper_bgcolor='white'
+            paper_bgcolor='white',
+            legend={'font': {'color': 'black'}}
         )
         
-        fig.update_xaxes(showgrid=True, gridcolor='lightgray')
-        fig.update_yaxes(showgrid=True, gridcolor='lightgray', tickformat=',.0f')
+        fig.update_xaxes(
+            showgrid=True, 
+            gridcolor='lightgray',
+            title_font=dict(size=14, color='black', family='Arial'),
+            tickfont=dict(size=12, color='black', family='Arial'),
+            linecolor='black',
+            linewidth=2
+        )
+        fig.update_yaxes(
+            showgrid=True, 
+            gridcolor='lightgray', 
+            tickformat=',.0f',
+            title_font=dict(size=14, color='black', family='Arial'),
+            tickfont=dict(size=12, color='black', family='Arial'),
+            linecolor='black',
+            linewidth=2
+        )
         
         return fig
     
     def create_pie_chart(self, data: Dict[str, Any], data_source: str, year: int) -> go.Figure:
-        """Stwórz wykres kołowy dla udziałów"""
+        """Wykres kołowy z czytelnymi etykietami"""
         
         countries = data.get('countries', data.get('regions', data.get('names', [])))
         values = data.get('values', [])
@@ -173,7 +197,7 @@ class ChartVisualizer:
         
         countries_filtered, values_filtered = zip(*filtered_data)
         
-        # Ogranicz do top 10 dla czytelności
+        # Ogranicz do top 10
         if len(countries_filtered) > 10:
             sorted_data = sorted(zip(countries_filtered, values_filtered), 
                                key=lambda x: x[1], reverse=True)
@@ -186,35 +210,37 @@ class ChartVisualizer:
             textinfo='label+percent',
             textposition='auto',
             marker=dict(colors=self.color_palette[:len(countries_filtered)]),
-            hovertemplate='<b>%{label}</b><br>Wartość: %{value:,.0f}<br>Udział: %{percent}<extra></extra>'
+            hovertemplate='<b>%{label}</b><br>Wartość: %{value:,.0f}<br>Udział: %{percent}<extra></extra>',
+            textfont=dict(size=12, color='black', family='Arial')
         )])
         
-        title = f"{self._get_data_type_name(data_source)} - {year}"
+        title = f"{data_source} - {year}"
         
         fig.update_layout(
             title={
                 'text': title,
                 'x': 0.5,
                 'xanchor': 'center',
-                'font': {'size': 16, 'color': 'black'}
+                'font': {'size': 18, 'color': 'black', 'family': 'Arial'}
             },
             width=self.width,
             height=self.height,
-            font={'size': self.font_size},
+            font={'size': self.font_size, 'color': 'black', 'family': 'Arial'},
             showlegend=True,
             legend=dict(
                 orientation="v",
                 yanchor="middle",
                 y=0.5,
                 xanchor="left",
-                x=1.01
+                x=1.01,
+                font=dict(color='black')
             )
         )
         
         return fig
     
     def create_comparison_chart(self, data: Dict[str, Any], data_source: str) -> go.Figure:
-        """Stwórz wykres porównawczy (subplot dla 2 krajów)"""
+        """Wykres porównawczy (subplot dla 2 krajów)"""
         
         countries = data.get('countries', data.get('regions', data.get('names', [])))
         years = data.get('years', [])
@@ -243,118 +269,57 @@ class ChartVisualizer:
                     showlegend=False,
                     text=[f'{v:,.0f}' if v > 0 else '' for v in country_values],
                     textposition='auto',
-                    hovertemplate=f'<b>{country}</b><br>Rok: %{{x}}<br>Wartość: %{{y:,.0f}}<extra></extra>'
+                    hovertemplate=f'<b>{country}</b><br>Rok: %{{x}}<br>Wartość: %{{y:,.0f}}<extra></extra>',
+                    textfont=dict(color='black', size=10)
                 ),
                 row=1, col=i+1
             )
         
         fig.update_layout(
             title={
-                'text': f"Porównanie: {self._get_data_type_name(data_source)}",
+                'text': f"Porównanie: {data_source}",
                 'x': 0.5,
                 'xanchor': 'center',
-                'font': {'size': 16, 'color': 'black'}
+                'font': {'size': 18, 'color': 'black', 'family': 'Arial'}
             },
             width=self.width,
             height=self.height,
-            font={'size': self.font_size},
+            font={'size': self.font_size, 'color': 'black', 'family': 'Arial'},
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
         
-        fig.update_xaxes(title_text="Rok", showgrid=True, gridcolor='lightgray')
-        fig.update_yaxes(title_text=self._get_y_axis_label(data_source), 
-                        showgrid=True, gridcolor='lightgray', tickformat=',.0f')
-        
-        return fig
-    
-    def create_regional_breakdown_chart(self, regions: List[RegionData], 
-                                      country_code: str, year: int) -> go.Figure:
-        """Stwórz wykres rozkładu regionalnego w kraju"""
-        
-        # Filtruj regiony dla konkretnego kraju i roku
-        country_regions = [r for r in regions if r.country_code == country_code.upper()]
-        
-        region_names = []
-        region_values = []
-        nuts_levels = []
-        
-        for region in country_regions:
-            value = region.get_value_for_year(year)
-            if value is not None and value > 0:
-                region_names.append(region.region_name)
-                region_values.append(value)
-                nuts_levels.append(region.nuts_level)
-        
-        if not region_names:
-            return self._create_empty_chart(f"Brak danych regionalnych dla {country_code} w {year}")
-        
-        # Sortuj malejąco
-        sorted_data = sorted(zip(region_names, region_values, nuts_levels), 
-                           key=lambda x: x[1], reverse=True)
-        region_names, region_values, nuts_levels = zip(*sorted_data)
-        
-        # Ogranicz do top 15 dla czytelności
-        if len(region_names) > 15:
-            region_names = region_names[:15]
-            region_values = region_values[:15]
-            nuts_levels = nuts_levels[:15]
-        
-        # Koloruj według poziomu NUTS
-        colors = []
-        nuts_colors = {0: '#1f77b4', 1: '#ff7f0e', 2: '#2ca02c', 3: '#d62728'}
-        for nuts in nuts_levels:
-            colors.append(nuts_colors.get(nuts, '#9467bd'))
-        
-        fig = go.Figure(data=[
-            go.Bar(
-                y=region_names,
-                x=region_values,
-                orientation='h',
-                marker_color=colors,
-                text=[f'{v:,.0f}' for v in region_values],
-                textposition='auto',
-                hovertemplate='<b>%{y}</b><br>Wartość: %{x:,.0f}<br>NUTS: %{customdata}<extra></extra>',
-                customdata=nuts_levels
-            )
-        ])
-        
-        fig.update_layout(
-            title={
-                'text': f"Regiony - {country_code.upper()} ({year})",
-                'x': 0.5,
-                'xanchor': 'center',
-                'font': {'size': 16, 'color': 'black'}
-            },
-            xaxis_title="Liczba pojazdów",
-            yaxis_title="Region",
-            width=self.width,
-            height=max(400, len(region_names) * 25),
-            font={'size': 10},
-            margin=dict(l=200, r=50, t=80, b=50),
-            plot_bgcolor='white',
-            paper_bgcolor='white'
+        fig.update_xaxes(
+            title_text="Rok", 
+            showgrid=True, 
+            gridcolor='lightgray',
+            title_font=dict(color='black', family='Arial'),
+            tickfont=dict(color='black', family='Arial')
         )
-        
-        fig.update_xaxes(showgrid=True, gridcolor='lightgray', tickformat=',.0f')
-        fig.update_yaxes(showgrid=False)
+        fig.update_yaxes(
+            title_text=self._get_y_axis_label(data_source), 
+            showgrid=True, 
+            gridcolor='lightgray', 
+            tickformat=',.0f',
+            title_font=dict(color='black', family='Arial'),
+            tickfont=dict(color='black', family='Arial')
+        )
         
         return fig
     
     def create_top_n_chart(self, data: Dict[str, Any], data_source: str) -> go.Figure:
-        """Stwórz wykres top N krajów/regionów"""
+        """Wykres top N krajów/regionów"""
         
         names = data.get('names', [])
         totals = data.get('totals', [])
-        sort_criterion = data.get('sort_criterion', 'total')
         
         if not names or not totals:
             return self._create_empty_chart("Brak danych do wyświetlenia")
         
         # Sortuj i ogranicz jeśli potrzeba
         sorted_data = sorted(zip(names, totals), key=lambda x: x[1], reverse=True)
-        if len(sorted_data) > 20:  # Maksymalnie 20 dla czytelności
-            sorted_data = sorted_data[:20]
+        if len(sorted_data) > 15:  # Maksymalnie 15 dla czytelności
+            sorted_data = sorted_data[:15]
         
         names_sorted, totals_sorted = zip(*sorted_data)
         
@@ -367,34 +332,122 @@ class ChartVisualizer:
                 marker_color=colors,
                 text=[f'{v:,.0f}' for v in totals_sorted],
                 textposition='auto',
-                hovertemplate='<b>%{x}</b><br>Wartość: %{y:,.0f}<extra></extra>'
+                hovertemplate='<b>%{x}</b><br>Wartość: %{y:,.0f}<extra></extra>',
+                textfont=dict(color='black', size=10)
             )
         ])
         
-        criterion_names = {
-            'total': 'suma całkowita',
-            'average': 'średnia',
-            'latest': 'najnowsza wartość'
-        }
-        
         fig.update_layout(
             title={
-                'text': f"Top {len(names_sorted)} - {self._get_data_type_name(data_source)} ({criterion_names.get(sort_criterion, sort_criterion)})",
+                'text': f"Top {len(names_sorted)} - {data_source}",
                 'x': 0.5,
                 'xanchor': 'center',
-                'font': {'size': 16, 'color': 'black'}
+                'font': {'size': 18, 'color': 'black', 'family': 'Arial'}
             },
-            xaxis_title="Kraj/Region",
+            xaxis_title="Element",
             yaxis_title=self._get_y_axis_label(data_source),
             width=self.width,
             height=self.height,
-            font={'size': self.font_size},
+            font={'size': self.font_size, 'color': 'black', 'family': 'Arial'},
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
         
-        fig.update_xaxes(showgrid=True, gridcolor='lightgray', tickangle=45)
-        fig.update_yaxes(showgrid=True, gridcolor='lightgray', tickformat=',.0f')
+        fig.update_xaxes(
+            showgrid=True, 
+            gridcolor='lightgray', 
+            tickangle=45,
+            title_font=dict(color='black', family='Arial'),
+            tickfont=dict(color='black', family='Arial'),
+            linecolor='black',
+            linewidth=2
+        )
+        fig.update_yaxes(
+            showgrid=True, 
+            gridcolor='lightgray', 
+            tickformat=',.0f',
+            title_font=dict(color='black', family='Arial'),
+            tickfont=dict(color='black', family='Arial'),
+            linecolor='black',
+            linewidth=2
+        )
+        
+        return fig
+    
+    def create_regional_breakdown_chart(self, regions: List[RegionData], 
+                                      country_code: str, year: int) -> go.Figure:
+        """Wykres rozkładu regionalnego w kraju"""
+        
+        # Filtruj regiony dla konkretnego kraju i roku
+        country_regions = [r for r in regions if r.country_code == country_code.upper()]
+        
+        region_names = []
+        region_values = []
+        
+        for region in country_regions:
+            value = region.get_value_for_year(year)
+            if value is not None and value > 0:
+                region_names.append(region.region_name)
+                region_values.append(value)
+        
+        if not region_names:
+            return self._create_empty_chart(f"Brak danych regionalnych dla {country_code} w {year}")
+        
+        # Sortuj malejąco
+        sorted_data = sorted(zip(region_names, region_values), 
+                           key=lambda x: x[1], reverse=True)
+        region_names, region_values = zip(*sorted_data)
+        
+        # Ogranicz do top 12 dla czytelności
+        if len(region_names) > 12:
+            region_names = region_names[:12]
+            region_values = region_values[:12]
+        
+        # Jednolity kolor dla regionów
+        color = '#2E86AB'
+        
+        fig = go.Figure(data=[
+            go.Bar(
+                y=region_names,
+                x=region_values,
+                orientation='h',
+                marker_color=color,
+                text=[f'{v:,.0f}' for v in region_values],
+                textposition='auto',
+                hovertemplate='<b>%{y}</b><br>Wartość: %{x:,.0f}<extra></extra>',
+                textfont=dict(color='white', size=11)
+            )
+        ])
+        
+        fig.update_layout(
+            title={
+                'text': f"Regiony - {country_code.upper()} ({year})",
+                'x': 0.5,
+                'xanchor': 'center',
+                'font': {'size': 18, 'color': 'black', 'family': 'Arial'}
+            },
+            xaxis_title="Liczba pojazdów",
+            yaxis_title="Region",
+            width=self.width,
+            height=max(400, len(region_names) * 30),
+            font={'size': 11, 'color': 'black', 'family': 'Arial'},
+            margin=dict(l=200, r=50, t=80, b=50),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
+        )
+        
+        fig.update_xaxes(
+            showgrid=True, 
+            gridcolor='lightgray', 
+            tickformat=',.0f',
+            title_font=dict(color='black', family='Arial'),
+            tickfont=dict(color='black', family='Arial')
+        )
+        fig.update_yaxes(
+            showgrid=False,
+            title_font=dict(color='black', family='Arial'),
+            tickfont=dict(color='black', family='Arial')
+        )
         
         return fig
     
@@ -407,7 +460,7 @@ class ChartVisualizer:
             xref="paper", yref="paper",
             x=0.5, y=0.5,
             xanchor='center', yanchor='middle',
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color="gray", family='Arial'),
             showarrow=False
         )
         
@@ -417,21 +470,11 @@ class ChartVisualizer:
             plot_bgcolor='white',
             paper_bgcolor='white',
             xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False)
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            font={'family': 'Arial'}
         )
         
         return fig
-    
-    def _generate_chart_title(self, countries: List[str], data_source: str) -> str:
-        """Generuj tytuł wykresu"""
-        data_type = self._get_data_type_name(data_source)
-        
-        if len(countries) == 1:
-            return f"{data_type} - {countries[0]}"
-        elif len(countries) <= 3:
-            return f"{data_type} - {', '.join(countries)}"
-        else:
-            return f"{data_type} - {len(countries)} krajów/regionów"
     
     def _get_y_axis_label(self, data_source: str) -> str:
         """Pobierz etykietę osi Y"""
@@ -439,10 +482,3 @@ class ChartVisualizer:
             return "Liczba zutylizowanych pojazdów"
         else:
             return "Liczba pojazdów elektrycznych"
-    
-    def _get_data_type_name(self, data_source: str) -> str:
-        """Pobierz czytelną nazwę typu danych"""
-        if "zutylizowane" in data_source.lower() or "environmental" in data_source.lower():
-            return "Pojazdy zutylizowane"
-        else:
-            return "Pojazdy elektryczne"

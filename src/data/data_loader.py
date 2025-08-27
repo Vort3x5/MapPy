@@ -20,17 +20,13 @@ class EnvironmentalDataLoader(DataLoader):
     
     def load(self, file_path: str) -> List[CountryData]:
         try:
-            print(f"Wczytywanie danych środowiskowych z: {file_path}")
             df = pd.read_excel(file_path, sheet_name='Sheet 1', header=None)
             countries = self._parse_data(df)
-            print(f"Załadowano {len(countries)} krajów")
             return countries
         
         except FileNotFoundError:
-            print(f"Nie znaleziono pliku: {file_path}")
             return []
         except Exception as e:
-            print(f"Błąd wczytywania: {e}")
             logging.error(f"Error loading environmental data: {e}")
             return []
     
@@ -50,8 +46,6 @@ class EnvironmentalDataLoader(DataLoader):
                         years.append(year)
                 except (ValueError, TypeError):
                     continue
-        
-        print(f"Znalezione lata: {years}")
         
         for row_idx in range(data_start_row, len(df)):
             country_name = df.iloc[row_idx, 0]
@@ -128,17 +122,13 @@ class TransportDataLoader(DataLoader):
     
     def load(self, file_path: str) -> List[RegionData]:
         try:
-            print(f"Wczytywanie danych transportowych z: {file_path}")
             df = pd.read_excel(file_path, sheet_name='Sheet 1', header=None)
             regions = self._parse_data(df)
-            print(f"Załadowano {len(regions)} regionów")
             return regions
         
         except FileNotFoundError:
-            print(f"Nie znaleziono pliku: {file_path}")
             return []
         except Exception as e:
-            print(f"Błąd wczytywania: {e}")
             logging.error(f"Error loading transport data: {e}")
             return []
     
