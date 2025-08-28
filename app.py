@@ -42,7 +42,6 @@ def init_session_state():
 def main():
     st.set_page_config(
         page_title="Eurostat Vehicle Data Analyzer",
-        page_icon="🚗",
         layout="wide"
     )
     
